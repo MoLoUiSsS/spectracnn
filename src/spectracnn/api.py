@@ -48,7 +48,9 @@ class LoadedModel:
             raise ValueError("iq must have shape (n, 2)")
         if not np.isfinite(iq).all():
             raise ValueError("iq frame contains non-finite values")
-        power = float(np.mean(iq**2))
+        # The model is trained on unit *complex* power: mean(I^2 + Q^2) = 1.
+        # Averaging over both rows would incorrectly double the amplitude.
+        power = float(np.mean(np.sum(iq.astype(np.float64) ** 2, axis=1)))
         if power <= 1e-12:
             raise ValueError("iq frame has zero power")
         normalized = (iq / np.sqrt(power)).astype(np.float32)

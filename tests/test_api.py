@@ -1,9 +1,39 @@
 from __future__ import annotations
 
+import numpy as np
+import torch
 from fastapi.testclient import TestClient
 
-from spectracnn.api import create_app
+from spectracnn.api import LoadedModel, create_app
 from spectracnn.config import Settings
+from spectracnn.signals import MODULATIONS, generate_sample
+
+
+class _PowerProbe(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.complex_power = None
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.complex_power = float((x**2).mean().item() * 2.0)
+        return torch.zeros((x.shape[0], len(MODULATIONS)))
+
+
+def test_predict_normalizes_to_unit_complex_power():
+    module = _PowerProbe()
+    bundle = LoadedModel(
+        module=module,
+        classes=list(MODULATIONS),
+        length=256,
+        metrics={},
+        trained_at="",
+        parameters=0,
+    )
+    frame = generate_sample("QPSK", 256, 10.0, np.random.default_rng(4))
+    bundle.predict(frame.T)
+
+    assert module.complex_power is not None
+    assert abs(module.complex_power - 1.0) < 1e-5
 
 
 def test_root_and_health(client):
