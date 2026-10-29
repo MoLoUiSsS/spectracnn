@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SpectraCNN — 5G/6G Modulation Classifier</title>
+  <style>
+    :root {
+      --bg: #060a12;
+      --panel: #0d1524;
+      --panel-2: #111c30;
+      --line: #1e2b42;
+      --text: #e5edf8;
+      --muted: #91a3bd;
+      --cyan: #22d3ee;
+      --violet: #a78bfa;
+      --green: #34d399;
+      --amber: #fbbf24;
+      --red: #fb7185;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(900px 500px at 12% -8%, rgba(34, 211, 238, 0.14), transparent 60%),
+        radial-gradient(800px 500px at 92% 0%, rgba(167, 139, 250, 0.12), transparent 55%),
+        var(--bg);
+    }
+    header {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 26px 22px 8px;
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      font-size: 15px;
+    }
+    .brand span { color: var(--cyan); }
+    .tag { color: var(--muted); font-size: 13px; }
+    main {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 18px 22px 40px;
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 880px) { main { grid-template-columns: 1fr; } }
+    .card {
+      background: linear-gradient(180deg, rgba(17, 28, 48, 0.92), rgba(13, 21, 36, 0.92));
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 22px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+    }
+    h1 { font-size: 24px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.02em; }
+    h2 { font-size: 15px; margin: 0 0 6px; }
+    p { margin: 0; }
+    .muted { color: var(--muted); font-size: 14px; line-height: 1.55; }
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr auto;
+      gap: 12px;
+      align-items: end;
+      margin: 20px 0 16px;
+    }
+    @media (max-width: 620px) { .controls { grid-template-columns: 1fr; } }
+    label { display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: var(--muted); }
+    label .value { color: var(--text); font-variant-numeric: tabular-nums; }
+    select, button {
+      font: inherit;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 11px 12px;
+    }
+    select:focus, button:focus, input:focus { outline: 2px solid rgba(34, 211, 238, 0.55); outline-offset: 2px; }
+    input[type="range"] { width: 100%; accent-color: var(--cyan); }
+    button {
+      cursor: pointer;
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--cyan), #0ea5e9);
+      color: #031018;
+      font-weight: 700;
+      white-space: nowrap;
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+    button:hover { transform: translateY(-1px); filter: brightness(1.06); }
+    button:disabled { opacity: 0.6; cursor: wait; transform: none; }
+    canvas {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1 / 1;
+      display: block;
+      background: #050912;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+    }
+    .legend { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .result-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+    .pred { font-size: 46px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; margin-top: 14px; }
+    .conf { color: var(--cyan); font-size: 14px; font-weight: 600; }
+    .truth { color: var(--muted); font-size: 13px; margin-top: 8px; }
+    #status { font-size: 13px; color: var(--muted); min-height: 18px; }
+    #status.ok { color: var(--green); }
+    #status.bad { color: var(--amber); }
+    #status.error { color: var(--red); }
+    .bars { display: grid; gap: 11px; margin-top: 22px; }
+    .prob-head { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px; }
+    .prob-head span:last-child { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .track { height: 8px; border-radius: 99px; background: #0a1424; overflow: hidden; border: 1px solid #172338; }
+    .fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--cyan), var(--violet)); transition: width 0.45s ease; }
+    .meta { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12.5px; }
+    .meta a { color: var(--cyan); text-decoration: none; }
+    footer { max-width: 1120px; margin: 0 auto; padding: 0 22px 30px; color: #66788f; font-size: 12px; }
+    code { color: #bae6fd; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">SPECTRA<span>CNN</span></div>
+    <div class="tag">5G / 6G · automatic modulation classification · PyTorch 1D CNN</div>
+  </header>
+
+  <main>
+    <section class="card" aria-label="Signal demo">
+      <h1>See the signal. Name the modulation.</h1>
+      <p class="muted">Generate a synthetic I/Q frame with pulse shaping, carrier offset, timing error and AWGN, then let the CNN classify it.</p>
+
+      <div class="controls">
+        <label>Modulation
+          <select id="modulation">
+            <option value="">Random</option>
+            <option>BPSK</option>
+            <option>QPSK</option>
+            <option>16QAM</option>
+            <option>64QAM</option>
+          </select>
+        </label>
+        <label>SNR <span class="value"><span id="snrValue">10</span> dB</span>
+          <input id="snr" type="range" min="-10" max="20" step="1" value="10" />
+        </label>
+        <button id="run" type="button">Classify frame</button>
+      </div>
+
+      <canvas id="constellation" width="640" height="640" aria-label="Received constellation"></canvas>
+      <div class="legend"><span>I →</span><span>Q ↑</span></div>
+    </section>
+
+    <section class="card" aria-label="Classification result">
+      <div class="result-head">
+        <h2>Prediction</h2>
+        <span id="status">Ready</span>
+      </div>
+      <div class="pred" id="prediction">—</div>
+      <div class="conf" id="confidence"></div>
+      <div class="truth" id="truth">Waiting for a frame…</div>
+      <div class="bars" id="bars"></div>
+      <div class="meta">
+        <span id="latency"></span>
+        <a href="/docs">API docs →</a>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Demo generated locally · no data leaves this service · <code>GET /demo?modulation=16QAM&amp;snr_db=10</code>
+  </footer>
+
+  <script>
+    const canvas = document.getElementById("constellation");
+    const ctx = canvas.getContext("2d");
+    const predictionEl = document.getElementById("prediction");
+    const confidenceEl = document.getElementById("confidence");
+    const truthEl = document.getElementById("truth");
+    const statusEl = document.getElementById("status");
+    const barsEl = document.getElementById("bars");
+    const latencyEl = document.getElementById("latency");
+    const runButton = document.getElementById("run");
+    const snrInput = document.getElementById("snr");
+    const snrValue = document.getElementById("snrValue");
+    const modulationSelect = document.getElementById("modulation");
+
+    snrInput.addEventListener("input", () => { snrValue.textContent = snrInput.value; });
+    runButton.addEventListener("click", run);
+    modulationSelect.addEventListener("change", run);
+
+    function drawConstellation(points) {
+      const size = canvas.width;
+      ctx.clearRect(0, 0, size, size);
+      ctx.fillStyle = "#050912";
+      ctx.fillRect(0, 0, size, size);
+
+      let extent = 1.2;
+      for (const [i, q] of points) extent = Math.max(extent, Math.abs(i), Math.abs(q));
+      extent *= 1.12;
+      const scale = (size / 2) * 0.9 / extent;
+      const center = size / 2;
+
+      ctx.strokeStyle = "#122038";
+      ctx.lineWidth = 1;
+      for (let step = -2; step <= 2; step++) {
+        const offset = step * center / 2;
+        ctx.beginPath();
+        ctx.moveTo(center + offset, 20);
+        ctx.lineTo(center + offset, size - 20);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(20, center + offset);
+        ctx.lineTo(size - 20, center + offset);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = "#243653";
+      ctx.beginPath();
+      ctx.moveTo(center, 16);
+      ctx.lineTo(center, size - 16);
+      ctx.moveTo(16, center);
+      ctx.lineTo(size - 16, center);
+      ctx.stroke();
+
+      for (const [i, q] of points) {
+        const x = center + i * scale;
+        const y = center - q * scale;
+        ctx.beginPath();
+        ctx.arc(x, y, 2.4, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(34, 211, 238, 0.82)";
+        ctx.fill();
+      }
+    }
+
+    function renderBars(probabilities) {
+      barsEl.innerHTML = "";
+      for (const [label, probability] of Object.entries(probabilities)) {
+        const row = document.createElement("div");
+        row.innerHTML = `
+          <div class="prob-head"><span>${label}</span><span>${(probability * 100).toFixed(1)}%</span></div>
+          <div class="track"><div class="fill" style="width:${(probability * 100).toFixed(2)}%"></div></div>`;
+        barsEl.appendChild(row);
+      }
+    }
+
+    async function run() {
+      const snr = snrInput.value;
+      const modulation = modulationSelect.value;
+      runButton.disabled = true;
+      statusEl.className = "";
+      statusEl.textContent = "Generating frame…";
+
+      const query = new URLSearchParams({ snr_db: snr });
+      if (modulation) query.set("modulation", modulation);
+
+      try {
+        const response = await fetch(`/demo?${query.toString()}`);
+        if (!response.ok) throw new Error(await response.text());
+        const data = await response.json();
+
+        drawConstellation(data.constellation);
+        predictionEl.textContent = data.modulation;
+        confidenceEl.textContent = `${(data.confidence * 100).toFixed(1)}% confidence`;
+        truthEl.textContent = `true: ${data.true_modulation} · ${data.snr_db} dB · ${data.constellation.length} samples plotted`;
+        latencyEl.textContent = `inference ${data.latency_ms.toFixed(1)} ms`;
+        renderBars(data.probabilities);
+
+        const correct = data.modulation === data.true_modulation;
+        statusEl.textContent = correct ? "Correct classification" : "Misclassified — inspect the constellation";
+        statusEl.className = correct ? "ok" : "bad";
+      } catch (error) {
+        statusEl.textContent = "Request failed";
+        statusEl.className = "error";
+        truthEl.textContent = String(error.message || error);
+      } finally {
+        runButton.disabled = false;
+      }
+    }
+
+    drawConstellation([]);
+    run();
+  </script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+services:
+  api:
+    build: .
+    image: spectracnn:latest
+    ports:
+      - "8000:8000"
+    environment:
+      SPECTRACNN_API_KEY: ${SPECTRACNN_API_KEY:-}
+      SPECTRACNN_LOG_LEVEL: ${SPECTRACNN_LOG_LEVEL:-INFO}
+    restart: unless-stopped
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.16.2
+    profiles: ["mlops"]
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow:/mlflow
+
+volumes:
+  mlflow:
